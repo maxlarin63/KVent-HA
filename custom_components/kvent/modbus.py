@@ -1,0 +1,183 @@
+"""Async Modbus TCP client for Komfovent C4.
+
+No Home Assistant imports — independently testable.
+Protocol: Modbus TCP (MBAP + PDU).
+  Function 0x03 – Read Holding Registers
+  Function 0x06 – Write Single Register
+
+Register addresses are 1-based (as documented in the Komfovent C4 manual).
+The PDU uses 0-based addressing, so every address sent on the wire is (addr - 1).
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import struct
+from dataclasses import dataclass
+
+_LOGGER = logging.getLogger(__name__)
+
+_PROTOCOL_ID = 0x0000
+_DEFAULT_UNIT = 1
+_FUNC_READ = 0x03
+_FUNC_WRITE = 0x06
+_CONNECT_TIMEOUT = 10.0
+_IO_TIMEOUT = 5.0
+
+
+@dataclass
+class KVentData:
+    """Snapshot of all polled register values."""
+
+    power: bool           # REG_STATUS  (1000)
+    season: int           # REG_SEASON  (1001)  0=summer, 1=winter
+    service: bool         # REG_SERVICE (1007)  True when bit 14 is set
+    speed_manual: int     # REG_SPEED_MANUAL (1100)  0–4
+    speed: int            # REG_SPEED        (1101)  0–4 (actual)
+    mode: int             # REG_MODE         (1102)  0=manual, 1=auto
+    supply_temp: float    # REG_SUPPLY_TEMP  (1200)  °C (signed / 10)
+    setpoint: float       # REG_SETPOINT     (1201)  °C (signed / 10)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Internal frame helpers
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _build_read_frame(tid: int, addr: int, count: int, unit: int = _DEFAULT_UNIT) -> bytes:
+    """Build Modbus TCP read-holding-registers frame (function 0x03)."""
+    pdu = struct.pack(">BHH", _FUNC_READ, addr - 1, count)
+    mbap = struct.pack(">HHHB", tid, _PROTOCOL_ID, len(pdu) + 1, unit)
+    return mbap + pdu
+
+
+def _build_write_frame(tid: int, addr: int, value: int, unit: int = _DEFAULT_UNIT) -> bytes:
+    """Build Modbus TCP write-single-register frame (function 0x06)."""
+    pdu = struct.pack(">BHH", _FUNC_WRITE, addr - 1, value)
+    mbap = struct.pack(">HHHB", tid, _PROTOCOL_ID, len(pdu) + 1, unit)
+    return mbap + pdu
+
+
+def _decode_signed16(raw: int) -> float:
+    """Two's-complement 16-bit → signed Python int."""
+    return float(raw if raw < 0x8000 else raw - 0x10000)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Client
+# ──────────────────────────────────────────────────────────────────────────────
+
+class KVentModbusClient:
+    """Minimal async Modbus TCP client scoped to the KVent register map."""
+
+    def __init__(self, host: str, port: int = 502) -> None:
+        self.host = host
+        self.port = port
+        self._reader: asyncio.StreamReader | None = None
+        self._writer: asyncio.StreamWriter | None = None
+        self._tid: int = 1
+        self._lock = asyncio.Lock()
+
+    # ── Connection lifecycle ──────────────────────────────────────────────────
+
+    async def connect(self) -> None:
+        """Open TCP connection. Raises OSError / TimeoutError on failure."""
+        self._reader, self._writer = await asyncio.wait_for(
+            asyncio.open_connection(self.host, self.port),
+            timeout=_CONNECT_TIMEOUT,
+        )
+        _LOGGER.debug("KVent: connected to %s:%d", self.host, self.port)
+
+    async def disconnect(self) -> None:
+        """Close the TCP connection (idempotent)."""
+        if self._writer:
+            try:
+                self._writer.close()
+                await self._writer.wait_closed()
+            except Exception:  # noqa: BLE001
+                pass
+            finally:
+                self._writer = None
+                self._reader = None
+
+    async def _ensure_connected(self) -> None:
+        if self._writer is None or self._writer.is_closing():
+            await self.connect()
+
+    def _next_tid(self) -> int:
+        tid = self._tid
+        self._tid = (tid % 65534) + 1
+        return tid
+
+    # ── Raw register access ───────────────────────────────────────────────────
+
+    async def read_registers(self, addr: int, count: int) -> list[int]:
+        """Read `count` holding registers starting at 1-based `addr`."""
+        async with self._lock:
+            await self._ensure_connected()
+            tid = self._next_tid()
+            frame = _build_read_frame(tid, addr, count)
+
+            assert self._writer is not None  # noqa: S101 (guaranteed by _ensure_connected)
+            self._writer.write(frame)
+            await self._writer.drain()
+
+            assert self._reader is not None  # noqa: S101
+            header = await asyncio.wait_for(self._reader.readexactly(6), timeout=_IO_TIMEOUT)
+            _resp_tid, _proto, length = struct.unpack(">HHH", header)
+
+            body = await asyncio.wait_for(self._reader.readexactly(length), timeout=_IO_TIMEOUT)
+            # body layout: [unit_id][func][byte_count][data...]
+            func = body[1]
+            if func & 0x80:
+                raise OSError(f"Modbus exception code {body[2]:#x} for addr {addr}")
+            if func != _FUNC_READ:
+                raise OSError(f"Unexpected function code {func:#x}, expected {_FUNC_READ:#x}")
+
+            byte_count = body[2]
+            return [
+                struct.unpack_from(">H", body, 3 + i * 2)[0]
+                for i in range(byte_count // 2)
+            ]
+
+    async def write_register(self, addr: int, value: int) -> None:
+        """Write a single holding register at 1-based `addr`."""
+        async with self._lock:
+            await self._ensure_connected()
+            tid = self._next_tid()
+            frame = _build_write_frame(tid, addr, value)
+
+            assert self._writer is not None  # noqa: S101
+            self._writer.write(frame)
+            await self._writer.drain()
+
+            assert self._reader is not None  # noqa: S101
+            resp = await asyncio.wait_for(self._reader.readexactly(12), timeout=_IO_TIMEOUT)
+            func = resp[7]
+            if func & 0x80:
+                raise OSError(f"Modbus write exception code {resp[8]:#x} for addr {addr}")
+            if func != _FUNC_WRITE:
+                raise OSError(f"Unexpected write response func {func:#x}")
+
+    # ── High-level poll ───────────────────────────────────────────────────────
+
+    async def async_read_all(self) -> KVentData:
+        """Read the full KVent register snapshot in four contiguous blocks."""
+        # Block 1 – 1000..1001 (status, season)
+        b1 = await self.read_registers(1000, 2)
+        # Block 2 – 1007       (service bitfield)
+        b2 = await self.read_registers(1007, 1)
+        # Block 3 – 1100..1102 (speed_manual, speed, mode)
+        b3 = await self.read_registers(1100, 3)
+        # Block 4 – 1200..1201 (supply_temp, setpoint)
+        b4 = await self.read_registers(1200, 2)
+
+        return KVentData(
+            power=b1[0] == 1,
+            season=b1[1],
+            service=bool(b2[0] & 0x4000),
+            speed_manual=b3[0],
+            speed=b3[1],
+            mode=b3[2],
+            supply_temp=_decode_signed16(b4[0]) / 10.0,
+            setpoint=_decode_signed16(b4[1]) / 10.0,
+        )

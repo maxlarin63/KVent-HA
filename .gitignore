@@ -1,0 +1,19 @@
+# Credentials — never commit
+.env.ha
+
+# Python artefacts
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# VS Code / Cursor local state
+.vscode/settings.json
+
+# macOS
+.DS_Store

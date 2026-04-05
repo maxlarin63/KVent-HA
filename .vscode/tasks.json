@@ -1,0 +1,74 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Deploy to HA (rsync / WSL)",
+      "type": "shell",
+      "command": "bash scripts/deploy-ha-rsync.sh",
+      "windows": {
+        "command": "powershell -ExecutionPolicy Bypass -File scripts\\deploy-ha-wsl.ps1"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Deploy to HA (scp, no WSL)",
+      "type": "shell",
+      "command": "bash scripts/deploy-ha-rsync.sh",
+      "windows": {
+        "command": "powershell -ExecutionPolicy Bypass -File scripts\\deploy-ha-scp.ps1"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Tests",
+      "type": "shell",
+      "command": ".venv/bin/pytest --tb=short",
+      "windows": {
+        "command": ".venv\\Scripts\\pytest --tb=short"
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Lint (ruff)",
+      "type": "shell",
+      "command": ".venv/bin/ruff check custom_components/",
+      "windows": {
+        "command": ".venv\\Scripts\\ruff check custom_components\\"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Clean",
+      "type": "shell",
+      "command": "bash scripts/clean.sh",
+      "windows": {
+        "command": "powershell -ExecutionPolicy Bypass -File scripts\\clean.ps1"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    }
+  ]
+}
