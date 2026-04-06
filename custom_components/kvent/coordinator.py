@@ -8,8 +8,16 @@ from datetime import timedelta
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DOMAIN, MODE_MANUAL, REG_MODE, REG_SEASON, REG_SPEED_MANUAL, REG_STATUS
-from .modbus import KVentData, KVentModbusClient
+from .const import (
+    DOMAIN,
+    MODE_MANUAL,
+    REG_MODE,
+    REG_SEASON,
+    REG_SETPOINT,
+    REG_SPEED_MANUAL,
+    REG_STATUS,
+)
+from .modbus import KVentData, KVentModbusClient, encode_setpoint_register
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -73,6 +81,11 @@ class KVentCoordinator(DataUpdateCoordinator[KVentData]):
         """Switch to Manual mode at the given speed level (0–4) then refresh."""
         await self._client.write_register(REG_MODE, MODE_MANUAL)
         await self._client.write_register(REG_SPEED_MANUAL, level)
+        await self.async_request_refresh()
+
+    async def async_set_setpoint(self, celsius: float) -> None:
+        """Write temperature setpoint (register 1201, R/W) then refresh."""
+        await self._client.write_register(REG_SETPOINT, encode_setpoint_register(celsius))
         await self.async_request_refresh()
 
     async def async_write_register(self, addr: int, value: int) -> None:

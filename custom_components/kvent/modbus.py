@@ -67,6 +67,13 @@ def _decode_signed16(raw: int) -> float:
     return float(raw if raw < 0x8000 else raw - 0x10000)
 
 
+def encode_setpoint_register(celsius: float) -> int:
+    """Encode setpoint °C for Modbus holding register 1201 (signed int16, tenths of °C on wire)."""
+    tenths = int(round(celsius * 10))
+    tenths = max(-32768, min(32767, tenths))
+    return tenths & 0xFFFF
+
+
 class ModbusSlaveBusyError(Exception):
     """Raised when the unit responds with exception 0x06 (slave device busy)."""
 

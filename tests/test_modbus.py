@@ -13,6 +13,7 @@ from custom_components.kvent.modbus import (
     _build_read_frame,
     _build_write_frame,
     _decode_signed16,
+    encode_setpoint_register,
 )
 
 
@@ -65,6 +66,15 @@ def test_decode_signed16_zero():
 def test_decode_signed16_negative():
     # -50 in two's complement 16-bit = 0xFFCE
     assert _decode_signed16(0xFFCE) == -50.0
+
+
+def test_encode_setpoint_round_trip():
+    assert encode_setpoint_register(20.5) == 205
+    assert _decode_signed16(encode_setpoint_register(-2.5)) == -25.0
+
+
+def test_encode_setpoint_negative_wire_format():
+    assert encode_setpoint_register(-2.5) == 0xFFE7
 
 
 # ──────────────────────────────────────────────────────────────────────────────

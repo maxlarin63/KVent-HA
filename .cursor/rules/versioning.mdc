@@ -1,20 +1,36 @@
 ---
-description: Bump KVent version when deployable files change
+description: MUST bump KVent version when deployable files change (strict)
 globs: ["custom_components/kvent/**", "scripts/deploy-ha-scp.ps1"]
-alwaysApply: false
+alwaysApply: true
 ---
 
-# Version bump rule
+# KVent version bump (strict)
 
-If you change **deployable** files (anything under `custom_components/kvent/` or `scripts/deploy-ha-scp.ps1`), you must bump the integration version.
+## Requirement
 
-## How to bump
+Any edit that changes **deployable** artifacts **must** include a **SemVer bump in the same change set** (same task / commit). Never leave `custom_components/kvent/` or `scripts/deploy-ha-scp.ps1` changes at the old version.
 
-- Update `custom_components/kvent/manifest.json` → `"version"` (SemVer `MAJOR.MINOR.PATCH`)
-- Keep `custom_components/kvent/const.py` → `INTEGRATION_VERSION` in sync with `manifest.json`
+**Deployable paths:**
 
-## Guidance
+- Everything under `custom_components/kvent/` (code, `manifest.json`, `strings.json`, `translations/**`, etc.)
+- `scripts/deploy-ha-scp.ps1`
 
-- **PATCH**: bug fixes, small behavior tweaks, refactors that change runtime behavior
-- **MINOR**: new entities/features, new config/options, backward-compatible changes
-- **MAJOR**: breaking changes (renames, removed entities, changed semantics requiring user action)
+**No exceptions** for “small” fixes (e.g. one-line bugfix, signature fix, copy-only `strings.json`). If it ships on the HA host, bump the version.
+
+## How to bump (always both)
+
+1. `custom_components/kvent/manifest.json` → `"version": "MAJOR.MINOR.PATCH"`
+2. `custom_components/kvent/const.py` → `INTEGRATION_VERSION = "MAJOR.MINOR.PATCH"` (**must match** `manifest.json` exactly)
+
+## SemVer guidance
+
+- **PATCH**: bug fixes, small behavior tweaks, any runtime-impacting refactors
+- **MINOR**: new entities/platforms, new options, backward-compatible features
+- **MAJOR**: breaking changes (removed entities, renames, semantics that require user action)
+
+## Checklist before finishing a task
+
+- [ ] Touched `custom_components/kvent/**` or `scripts/deploy-ha-scp.ps1`?
+- [ ] If yes: bumped **both** `manifest.json` and `INTEGRATION_VERSION`?
+
+If the answer to the first is yes and the second is no, the task is **not done**.

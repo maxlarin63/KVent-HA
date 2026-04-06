@@ -13,6 +13,7 @@ One fan entity per config entry.  Controls:
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.config_entries import ConfigEntry
@@ -23,34 +24,19 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     DOMAIN,
+    FAN_STATE_TO_PRESET,
     MODE_AUTO,
+    MODE_MANUAL,
     PRESET_AUTO,
-    PRESET_BOOST,
     PRESET_MODES,
-    PRESET_SPEED_1,
-    PRESET_SPEED_2,
-    PRESET_SPEED_3,
-    PRESET_STANDBY,
     PRESET_TO_SPEED,
-    SPEED_BOOST,
-    SPEED_LEVEL_1,
-    SPEED_LEVEL_2,
-    SPEED_LEVEL_3,
-    SPEED_STANDBY,
+    SEASON_OPTION_WINTER,
+    SEASON_VALUE_TO_OPTION,
+    SPEED_MAP,
 )
 from .coordinator import KVentCoordinator
 
 _LOGGER = logging.getLogger(__name__)
-
-# Reverse map: (mode, speed_manual) → preset label
-_STATE_TO_PRESET: dict[tuple[int, int], str] = {
-    (MODE_AUTO, -1): PRESET_AUTO,   # auto: speed_manual is don't-care
-    (0, SPEED_STANDBY): PRESET_STANDBY,
-    (0, SPEED_LEVEL_1): PRESET_SPEED_1,
-    (0, SPEED_LEVEL_2): PRESET_SPEED_2,
-    (0, SPEED_LEVEL_3): PRESET_SPEED_3,
-    (0, SPEED_BOOST): PRESET_BOOST,
-}
 
 
 async def async_setup_entry(
@@ -97,14 +83,35 @@ class KVentFan(CoordinatorEntity[KVentCoordinator], FanEntity):
             return None
         if data.mode == MODE_AUTO:
             return PRESET_AUTO
-        return _STATE_TO_PRESET.get((0, data.speed_manual))
+        return FAN_STATE_TO_PRESET.get((MODE_MANUAL, data.speed_manual))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Mirror key sensor/select/binary state on the primary fan (more-info / dev tools).
+
+        Separate entities stay registered; this only duplicates their values for convenience.
+        """
+        d = self.coordinator.data
+        season = SEASON_VALUE_TO_OPTION.get(d.season, SEASON_OPTION_WINTER)
+        current = SPEED_MAP.get(d.speed, str(d.speed))
+        out: dict[str, Any] = {
+            "supply_air_temperature": d.supply_temp,
+            "setpoint_temperature": d.setpoint,
+            "ventilation_mode": "auto" if d.mode == MODE_AUTO else "manual",
+            "season": season,
+            "current_speed": current,
+            "service_required": d.service,
+        }
+        if d.mode != MODE_AUTO:
+            out["target_speed"] = SPEED_MAP.get(d.speed_manual, str(d.speed_manual))
+        return out
 
     # ── Commands ──────────────────────────────────────────────────────────────
 
-    async def async_turn_on(self, **kwargs: object) -> None:
+    async def async_turn_on(self, *args: Any, **kwargs: Any) -> None:
         await self.coordinator.async_set_power(True)
 
-    async def async_turn_off(self, **kwargs: object) -> None:
+    async def async_turn_off(self, *args: Any, **kwargs: Any) -> None:
         await self.coordinator.async_set_power(False)
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:

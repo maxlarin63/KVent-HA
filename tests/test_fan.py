@@ -97,6 +97,29 @@ def test_preset_manual_speeds(speed, expected):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# extra_state_attributes (aggregated snapshot on primary fan entity)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_extra_state_attributes_manual_includes_target_speed():
+    fan, _ = _make_fan(_make_data())
+    attrs = fan.extra_state_attributes
+    assert attrs["supply_air_temperature"] == 18.5
+    assert attrs["setpoint_temperature"] == 20.0
+    assert attrs["ventilation_mode"] == "manual"
+    assert attrs["season"] == "Winter"
+    assert attrs["current_speed"] == "Level 2"
+    assert attrs["target_speed"] == "Level 2"
+    assert attrs["service_required"] is False
+
+
+def test_extra_state_attributes_auto_omits_target_speed():
+    fan, _ = _make_fan(_make_data(mode=MODE_AUTO))
+    attrs = fan.extra_state_attributes
+    assert attrs["ventilation_mode"] == "auto"
+    assert "target_speed" not in attrs
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Commands
 # ──────────────────────────────────────────────────────────────────────────────
 

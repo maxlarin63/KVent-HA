@@ -23,8 +23,27 @@
     "abort": {
       "already_configured": "This Komfovent C4 unit is already configured."
     }
-  }
-  ,
+  },
+  "entity": {
+    "climate": {
+      "komfovent_climate": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "service_alert": "Service required"
+            }
+          },
+          "swing_mode": {
+            "name": "Season",
+            "state": {
+              "Summer": "Summer",
+              "Winter": "Winter"
+            }
+          }
+        }
+      }
+    }
+  },
   "options": {
     "step": {
       "init": {

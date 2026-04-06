@@ -19,7 +19,14 @@ from .coordinator import KVentCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[str] = ["fan", "sensor", "binary_sensor", "select"]
+PLATFORMS: list[str] = [
+    "fan",
+    "climate",
+    "sensor",
+    "binary_sensor",
+    "select",
+    "number",
+]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

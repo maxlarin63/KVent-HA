@@ -1,0 +1,22 @@
+{
+  "entity": {
+    "climate": {
+      "komfovent_climate": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "service_alert": "Service required"
+            }
+          },
+          "swing_mode": {
+            "name": "Season",
+            "state": {
+              "Summer": "Summer",
+              "Winter": "Winter"
+            }
+          }
+        }
+      }
+    }
+  }
+}

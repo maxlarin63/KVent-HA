@@ -3,7 +3,7 @@
 DOMAIN = "kvent"
 
 # Integration version (also mirrored in manifest.json)
-INTEGRATION_VERSION = "0.0.4"
+INTEGRATION_VERSION = "0.0.12"
 
 # Config entry keys
 CONF_HOST = "host"
@@ -24,7 +24,7 @@ REG_SPEED_MANUAL = 1100  # R/W  0=standby, 1–3=levels, 4=boost (manual mode ta
 REG_SPEED = 1101         # R    actual current speed (same encoding)
 REG_MODE = 1102          # R/W  0=manual, 1=auto
 REG_SUPPLY_TEMP = 1200   # R    signed int16 / 10 → °C
-REG_SETPOINT = 1201      # R    signed int16 / 10 → °C
+REG_SETPOINT = 1201      # R/W  signed int16 / 10 → °C
 
 # Service register bitmask
 SERVICE_BIT_MASK = 0x4000  # bit 14
@@ -64,6 +64,9 @@ PRESET_SPEED_3 = "Speed 3"
 PRESET_BOOST = "Boost"
 PRESET_STANDBY = "Standby"
 
+# Climate entity only: shown in Preset UI when REG_SERVICE reports maintenance.
+PRESET_SERVICE_ALERT = "service_alert"
+
 PRESET_MODES: list[str] = [
     PRESET_AUTO,
     PRESET_SPEED_1,
@@ -80,6 +83,16 @@ PRESET_TO_SPEED: dict[str, int] = {
     PRESET_SPEED_3: SPEED_LEVEL_3,
     PRESET_BOOST: SPEED_BOOST,
     PRESET_STANDBY: SPEED_STANDBY,
+}
+
+# Reverse map: (REG_MODE, speed_manual) → preset label (manual uses speed_manual; auto key unused).
+FAN_STATE_TO_PRESET: dict[tuple[int, int], str] = {
+    (MODE_AUTO, -1): PRESET_AUTO,
+    (MODE_MANUAL, SPEED_STANDBY): PRESET_STANDBY,
+    (MODE_MANUAL, SPEED_LEVEL_1): PRESET_SPEED_1,
+    (MODE_MANUAL, SPEED_LEVEL_2): PRESET_SPEED_2,
+    (MODE_MANUAL, SPEED_LEVEL_3): PRESET_SPEED_3,
+    (MODE_MANUAL, SPEED_BOOST): PRESET_BOOST,
 }
 
 # ──────────────────────────────────────────────
