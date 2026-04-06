@@ -24,4 +24,23 @@
       "already_configured": "This Komfovent C4 unit is already configured."
     }
   }
+  ,
+  "options": {
+    "step": {
+      "init": {
+        "title": "KVent options",
+        "description": "Adjust how often Home Assistant polls the unit.",
+        "data": {
+          "host": "IP Address / Hostname",
+          "port": "Modbus TCP Port",
+          "scan_interval": "Polling interval (seconds)"
+        },
+        "data_description": {
+          "host": "LAN address of the Komfovent C4 unit",
+          "port": "Default Modbus port is 502",
+          "scan_interval": "How often HA polls the unit (minimum 5 s)"
+        }
+      }
+    }
+  }
 }

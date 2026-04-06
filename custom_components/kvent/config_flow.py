@@ -6,8 +6,9 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlowWithReload
 from homeassistant.const import CONF_HOST
+from homeassistant.core import callback
 
 from .const import (
     CONF_PORT,
@@ -15,6 +16,7 @@ from .const import (
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    INTEGRATION_VERSION,
 )
 from .modbus import KVentModbusClient
 
@@ -53,6 +55,11 @@ class KVentConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlowWithReload:
+        return KVentOptionsFlow()
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -71,7 +78,7 @@ class KVentConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = error_key
             else:
                 return self.async_create_entry(
-                    title=f"Komfovent C4 ({host})",
+                    title=f"KVent C4 v{INTEGRATION_VERSION} ({host})",
                     data={
                         CONF_HOST: host,
                         CONF_PORT: port,
@@ -84,3 +91,35 @@ class KVentConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=STEP_USER_SCHEMA,
             errors=errors,
         )
+
+
+class KVentOptionsFlow(OptionsFlowWithReload):
+    """Handle KVent options (reconfigure polling interval, port)."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        current_host: str = self.config_entry.options.get(
+            CONF_HOST, self.config_entry.data.get(CONF_HOST, "")
+        )
+        current_port: int = self.config_entry.options.get(
+            CONF_PORT, self.config_entry.data.get(CONF_PORT, DEFAULT_PORT)
+        )
+        current_scan: int = self.config_entry.options.get(
+            CONF_SCAN_INTERVAL,
+            self.config_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+        )
+
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_HOST, default=current_host): str,
+                vol.Optional(CONF_PORT, default=current_port): vol.Coerce(int),
+                vol.Optional(CONF_SCAN_INTERVAL, default=current_scan): vol.All(
+                    vol.Coerce(int), vol.Range(min=5, max=3600)
+                ),
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=schema)

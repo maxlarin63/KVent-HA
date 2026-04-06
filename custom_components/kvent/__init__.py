@@ -6,7 +6,15 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_HOST, CONF_PORT, CONF_SCAN_INTERVAL, DEFAULT_PORT, DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import (
+    CONF_HOST,
+    CONF_PORT,
+    CONF_SCAN_INTERVAL,
+    DEFAULT_PORT,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    INTEGRATION_VERSION,
+)
 from .coordinator import KVentCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -16,9 +24,15 @@ PLATFORMS: list[str] = ["fan", "sensor", "binary_sensor", "select"]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up KVent from a config entry."""
-    host: str = entry.data[CONF_HOST]
-    port: int = entry.data.get(CONF_PORT, DEFAULT_PORT)
-    scan_interval: int = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+    host: str = entry.options.get(CONF_HOST, entry.data[CONF_HOST])
+    port: int = entry.options.get(CONF_PORT, entry.data.get(CONF_PORT, DEFAULT_PORT))
+    scan_interval: int = entry.options.get(
+        CONF_SCAN_INTERVAL, entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+    )
+
+    desired_title = f"KVent C4 v{INTEGRATION_VERSION} ({host})"
+    if entry.title != desired_title:
+        hass.config_entries.async_update_entry(entry, title=desired_title)
 
     coordinator = KVentCoordinator(hass, host, port, scan_interval)
 

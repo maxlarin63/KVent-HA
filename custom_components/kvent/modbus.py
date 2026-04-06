@@ -17,6 +17,11 @@ from dataclasses import dataclass
 
 _LOGGER = logging.getLogger(__name__)
 
+# Modbus exception 0x06 = Slave Device Busy (transient; device asks master to retry later).
+_BUSY_EXCEPTION = 0x06
+_BUSY_RETRIES = 4
+_BUSY_BASE_DELAY_S = 0.25
+
 _PROTOCOL_ID = 0x0000
 _DEFAULT_UNIT = 1
 _FUNC_READ = 0x03
@@ -60,6 +65,21 @@ def _build_write_frame(tid: int, addr: int, value: int, unit: int = _DEFAULT_UNI
 def _decode_signed16(raw: int) -> float:
     """Two's-complement 16-bit → signed Python int."""
     return float(raw if raw < 0x8000 else raw - 0x10000)
+
+
+class ModbusSlaveBusyError(Exception):
+    """Raised when the unit responds with exception 0x06 (slave device busy)."""
+
+
+def _parse_read_exception(addr: int, body: bytes) -> None:
+    """Raise if the read response is a Modbus exception PDU."""
+    func = body[1]
+    if not func & 0x80:
+        return
+    code = body[2]
+    if code == _BUSY_EXCEPTION:
+        raise ModbusSlaveBusyError(addr)
+    raise OSError(f"Modbus exception code {code:#x} for addr {addr}")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -110,34 +130,60 @@ class KVentModbusClient:
 
     # ── Raw register access ───────────────────────────────────────────────────
 
+    async def _read_registers_unlocked(self, addr: int, count: int) -> list[int]:
+        """Single read attempt; caller must hold ``_lock``."""
+        await self._ensure_connected()
+        tid = self._next_tid()
+        frame = _build_read_frame(tid, addr, count)
+
+        assert self._writer is not None  # noqa: S101 (guaranteed by _ensure_connected)
+        self._writer.write(frame)
+        await self._writer.drain()
+
+        assert self._reader is not None  # noqa: S101
+        header = await asyncio.wait_for(self._reader.readexactly(6), timeout=_IO_TIMEOUT)
+        _resp_tid, _proto, length = struct.unpack(">HHH", header)
+
+        body = await asyncio.wait_for(self._reader.readexactly(length), timeout=_IO_TIMEOUT)
+        # body layout: [unit_id][func][byte_count][data...] or exception: [unit][func|0x80][ex_code]
+        _parse_read_exception(addr, body)
+        func = body[1]
+        if func != _FUNC_READ:
+            raise OSError(f"Unexpected function code {func:#x}, expected {_FUNC_READ:#x}")
+
+        byte_count = body[2]
+        return [
+            struct.unpack_from(">H", body, 3 + i * 2)[0]
+            for i in range(byte_count // 2)
+        ]
+
     async def read_registers(self, addr: int, count: int) -> list[int]:
-        """Read `count` holding registers starting at 1-based `addr`."""
-        async with self._lock:
-            await self._ensure_connected()
-            tid = self._next_tid()
-            frame = _build_read_frame(tid, addr, count)
+        """Read `count` holding registers starting at 1-based `addr`.
 
-            assert self._writer is not None  # noqa: S101 (guaranteed by _ensure_connected)
-            self._writer.write(frame)
-            await self._writer.drain()
-
-            assert self._reader is not None  # noqa: S101
-            header = await asyncio.wait_for(self._reader.readexactly(6), timeout=_IO_TIMEOUT)
-            _resp_tid, _proto, length = struct.unpack(">HHH", header)
-
-            body = await asyncio.wait_for(self._reader.readexactly(length), timeout=_IO_TIMEOUT)
-            # body layout: [unit_id][func][byte_count][data...]
-            func = body[1]
-            if func & 0x80:
-                raise OSError(f"Modbus exception code {body[2]:#x} for addr {addr}")
-            if func != _FUNC_READ:
-                raise OSError(f"Unexpected function code {func:#x}, expected {_FUNC_READ:#x}")
-
-            byte_count = body[2]
-            return [
-                struct.unpack_from(">H", body, 3 + i * 2)[0]
-                for i in range(byte_count // 2)
-            ]
+        Retries a few times if the unit returns Modbus exception 0x06 (slave device busy).
+        """
+        last_busy: ModbusSlaveBusyError | None = None
+        for attempt in range(_BUSY_RETRIES):
+            async with self._lock:
+                try:
+                    return await self._read_registers_unlocked(addr, count)
+                except ModbusSlaveBusyError as err:
+                    last_busy = err
+            if attempt < _BUSY_RETRIES - 1:
+                delay = _BUSY_BASE_DELAY_S * (attempt + 1)
+                _LOGGER.debug(
+                    "KVent: slave busy at addr %s (attempt %s/%s), retry in %.2fs",
+                    addr,
+                    attempt + 1,
+                    _BUSY_RETRIES,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+        assert last_busy is not None
+        raise OSError(
+            f"Modbus slave device busy (exception 0x{_BUSY_EXCEPTION:x}) for addr {addr} "
+            f"after {_BUSY_RETRIES} attempts"
+        ) from last_busy
 
     async def write_register(self, addr: int, value: int) -> None:
         """Write a single holding register at 1-based `addr`."""

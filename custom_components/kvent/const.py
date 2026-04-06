@@ -2,6 +2,9 @@
 
 DOMAIN = "kvent"
 
+# Integration version (also mirrored in manifest.json)
+INTEGRATION_VERSION = "0.0.4"
+
 # Config entry keys
 CONF_HOST = "host"
 CONF_PORT = "port"
@@ -9,7 +12,7 @@ CONF_SCAN_INTERVAL = "scan_interval"
 
 # Defaults
 DEFAULT_PORT = 502
-DEFAULT_SCAN_INTERVAL = 15
+DEFAULT_SCAN_INTERVAL = 5
 
 # ──────────────────────────────────────────────
 # Modbus register addresses (1-based, as in Komfovent C4 manual)

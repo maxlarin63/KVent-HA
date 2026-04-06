@@ -1,0 +1,20 @@
+---
+description: Bump KVent version when deployable files change
+globs: ["custom_components/kvent/**", "scripts/deploy-ha-scp.ps1"]
+alwaysApply: false
+---
+
+# Version bump rule
+
+If you change **deployable** files (anything under `custom_components/kvent/` or `scripts/deploy-ha-scp.ps1`), you must bump the integration version.
+
+## How to bump
+
+- Update `custom_components/kvent/manifest.json` → `"version"` (SemVer `MAJOR.MINOR.PATCH`)
+- Keep `custom_components/kvent/const.py` → `INTEGRATION_VERSION` in sync with `manifest.json`
+
+## Guidance
+
+- **PATCH**: bug fixes, small behavior tweaks, refactors that change runtime behavior
+- **MINOR**: new entities/features, new config/options, backward-compatible changes
+- **MAJOR**: breaking changes (renames, removed entities, changed semantics requiring user action)
