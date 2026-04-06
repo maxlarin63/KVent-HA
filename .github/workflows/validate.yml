@@ -12,6 +12,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: HACS preflight (public raw.githubusercontent.com)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          REF="${GITHUB_REF_NAME}"
+          RAW_URL="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${REF}/hacs.json"
+          RAW_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$RAW_URL" || echo "000")
+          if [ "$RAW_CODE" = "200" ]; then
+            echo "OK: hacs.json is reachable on raw.githubusercontent.com."
+            exit 0
+          fi
+          API_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/hacs.json?ref=${REF}"
+          API_CODE=$(curl -sS -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "$API_URL" || echo "000")
+          if [ "$API_CODE" = "200" ]; then
+            echo "::error title=HACS requires a public repository::HACS reads manifests via unauthenticated raw.githubusercontent.com (got HTTP ${RAW_CODE}). GitHub API sees hacs.json (HTTP 200), so this repo is likely private. Make it public, or duplicate these checks on a public fork. https://hacs.dev/docs/faq/private_repositories"
+            exit 1
+          fi
+          if [ "$API_CODE" = "404" ]; then
+            echo "::error::hacs.json not found for ref ${REF}. Push hacs.json to that branch on GitHub."
+            exit 1
+          fi
+          echo "::warning::Preflight inconclusive (raw=${RAW_CODE}, api=${API_CODE}); continuing."
       - uses: hacs/action@main
         with:
           category: integration

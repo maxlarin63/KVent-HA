@@ -29,6 +29,12 @@ In the repo **Settings → General → Topics**, add for example:
 
 Also ensure the repo has a **short description** and **Issues** enabled (other HACS checks).
 
+**Public repository:** HACS and `hacs/action` load `hacs.json` and integration `manifest.json` from
+public `raw.githubusercontent.com` URLs. On a **private** repo those requests return 404, so validation
+often reports an invalid `hacs.json` and `integration_manifest … got None` even when the files are
+committed. The integration must stay **public** for HACS users; use a public fork if you need private
+collaboration elsewhere.
+
 ---
 
 ## Installation
