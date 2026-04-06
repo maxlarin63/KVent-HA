@@ -111,7 +111,7 @@ def test_extra_state_attributes_service_and_speed():
     climate, _ = _make_climate(_make_data(service=True, speed=2, mode=MODE_MANUAL))
     attrs = climate.extra_state_attributes
     assert attrs["service_required"] is True
-    assert attrs["service_status"] == "Service required"
+    assert attrs["service_status"] == "🛠 Service required"
     assert attrs["ventilation_mode"] == "manual"
     assert attrs["current_speed"] == "Level 2"
     assert climate.preset_mode == PRESET_SERVICE_ALERT
@@ -137,6 +137,7 @@ def test_icon_none_when_no_service():
 def test_extra_state_attributes_auto_ventilation_mode():
     climate, _ = _make_climate(_make_data(mode=MODE_AUTO))
     assert climate.extra_state_attributes["ventilation_mode"] == "auto"
+    assert climate.extra_state_attributes["service_status"] == "✅ OK"
 
 
 @pytest.mark.asyncio
