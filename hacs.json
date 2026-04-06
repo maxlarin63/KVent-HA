@@ -1,1 +1,5 @@
-{ "name": "KVent (Komfovent C4)", "render_readme": true }
+{
+  "name": "KVent (Komfovent C4)",
+  "homeassistant": "2024.8.0",
+  "render_readme": true
+}

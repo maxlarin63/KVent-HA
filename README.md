@@ -20,6 +20,17 @@ No external Python dependencies — pure `asyncio` socket I/O.
 
 ---
 
+## GitHub repository settings (HACS / validation)
+
+HACS’ **topics** check reads your repository metadata on GitHub (not files in this repo).  
+In the repo **Settings → General → Topics**, add for example:
+
+`home-assistant`, `hacs-custom`, `custom-integration`, `komfovent`, `modbus`, `ventilation`
+
+Also ensure the repo has a **short description** and **Issues** enabled (other HACS checks).
+
+---
+
 ## Installation
 
 ### HACS (recommended)
