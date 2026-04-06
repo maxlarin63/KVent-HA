@@ -5,14 +5,14 @@
         "state_attributes": {
           "preset_mode": {
             "state": {
-              "service_alert": "Service required"
+              "service_alert": "🛠 Service required"
             }
           },
           "swing_mode": {
-            "name": "Season",
+            "name": "🌦 Season",
             "state": {
-              "Summer": "Summer",
-              "Winter": "Winter"
+              "Summer": "☀️ Summer",
+              "Winter": "❄️ Winter"
             }
           }
         }

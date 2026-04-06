@@ -76,6 +76,8 @@ class KVentClimate(CoordinatorEntity[KVentCoordinator], ClimateEntity):
         ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.PRESET_MODE
         | ClimateEntityFeature.SWING_MODE
+        | ClimateEntityFeature.TURN_ON
+        | ClimateEntityFeature.TURN_OFF
     )
 
     def __init__(self, coordinator: KVentCoordinator, entry: ConfigEntry) -> None:
@@ -158,7 +160,7 @@ class KVentClimate(CoordinatorEntity[KVentCoordinator], ClimateEntity):
         current = SPEED_MAP.get(d.speed, str(d.speed))
         return {
             "service_required": d.service,
-            "service_status": "Service required" if d.service else "OK",
+            "service_status": "🛠 Service required" if d.service else "✅ OK",
             "ventilation_mode": "auto" if d.mode == MODE_AUTO else "manual",
             "current_speed": current,
         }
@@ -171,6 +173,12 @@ class KVentClimate(CoordinatorEntity[KVentCoordinator], ClimateEntity):
             await self.coordinator.async_set_power(True)
             return
         _LOGGER.warning("Unsupported HVAC mode: %s", hvac_mode)
+
+    async def async_turn_on(self) -> None:
+        await self.coordinator.async_set_power(True)
+
+    async def async_turn_off(self) -> None:
+        await self.coordinator.async_set_power(False)
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         temp: float | None = kwargs.get("temperature")
