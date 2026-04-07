@@ -1,10 +1,24 @@
 """Shared pytest fixtures for KVent tests."""
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+import pytest_socket
 
 from custom_components.kvent.modbus import KVentData
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_fixture_setup(fixturedef: pytest.FixtureDef, request: pytest.FixtureRequest) -> None:
+    """Allow ProactorEventLoop self-pipe before pytest-asyncio builds the loop.
+
+    pytest-homeassistant-custom-component disables all sockets in pytest_runtest_setup,
+    which runs after fixture setup has started. The default event_loop fixture then
+    hits SocketBlockedError on Windows. Modbus I/O remains mocked in our tests.
+    """
+    if fixturedef.argname == "event_loop":
+        pytest_socket.enable_socket()
 
 
 @pytest.fixture

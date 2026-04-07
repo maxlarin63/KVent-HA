@@ -58,7 +58,7 @@ Go to **Settings → Devices & Services → Add Integration → KVent**.
 |---|---|---|
 | IP Address | — | LAN address of the C4 unit |
 | Port | `502` | Modbus TCP port |
-| Polling interval | `15` s | How often registers are read |
+| Polling interval | `5` s | How often registers are read (configurable 5–3600 s) |
 
 ---
 
