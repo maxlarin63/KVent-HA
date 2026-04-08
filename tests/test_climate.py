@@ -15,12 +15,14 @@ from custom_components.kvent.const import (
     PRESET_SERVICE_ALERT,
     PRESET_SPEED_1,
     PRESET_SPEED_2,
+    PRESET_SPEED_3,
     PRESET_STANDBY,
     SEASON_OPTION_SUMMER,
     SEASON_OPTION_WINTER,
     SPEED_BOOST,
     SPEED_LEVEL_1,
     SPEED_LEVEL_2,
+    SPEED_LEVEL_3,
     SPEED_STANDBY,
 )
 from custom_components.kvent.modbus import KVentData
@@ -88,10 +90,11 @@ def test_current_and_target_temperature():
     (SPEED_STANDBY, PRESET_STANDBY),
     (SPEED_LEVEL_1, PRESET_SPEED_1),
     (SPEED_LEVEL_2, PRESET_SPEED_2),
+    (SPEED_LEVEL_3, PRESET_SPEED_3),
     (SPEED_BOOST, PRESET_BOOST),
 ])
 def test_preset_manual_speeds(speed, expected):
-    climate, _ = _make_climate(_make_data(power=True, mode=MODE_MANUAL, speed_manual=speed))
+    climate, _ = _make_climate(_make_data(power=True, mode=MODE_MANUAL, speed=speed))
     assert climate.preset_mode == expected
 
 

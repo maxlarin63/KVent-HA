@@ -12,9 +12,9 @@ communicating over **Modbus TCP**.
 | Komfovent C4 | `fan` | Power on/off + preset modes (Auto / Speed 1–3 / Boost / Standby) |
 | Supply Air Temperature | `sensor` | REG 1200 — signed int16 / 10 → °C |
 | Setpoint Temperature | `sensor` | REG 1201 — signed int16 / 10 → °C |
-| Current Speed | `sensor` | REG 1101 — Standby / Level 1–3 / Boost |
+| Current Speed | `sensor` | REG 1101 — Standby / Level 1–3 / Override |
 | Season | `select` | REG 1001 — Summer / Winter |
-| Service Required | `binary_sensor` | REG 1007 bit 14 — PROBLEM class |
+| Service Required | `binary_sensor` | REG 1007 — binary; bit **14** (`0x4000`) = service required |
 
 No external Python dependencies — pure `asyncio` socket I/O.
 
@@ -29,7 +29,7 @@ In the repo **Settings → General → Topics**, add for example:
 
 Also ensure the repo has a **short description** and **Issues** enabled (other HACS checks).
 
-**Public repository:** HACS and `hacs/action` load `hacs.json` and integration `manifest.json` from
+**Public repository:** HACS and `hacs/action` load `hacs.json` and `manifest.json` from
 public `raw.githubusercontent.com` URLs. On a **private** repo those requests return 404, so validation
 often reports an invalid `hacs.json` and `integration_manifest … got None` even when the files are
 committed. The integration must stay **public** for HACS users; use a public fork if you need private
@@ -66,14 +66,14 @@ Go to **Settings → Devices & Services → Add Integration → KVent**.
 
 | Preset | Behaviour |
 |---|---|
-| **Auto** | Sets mode register (1102) to `1` — unit controls speed automatically |
-| **Speed 1** | Manual mode, speed_manual (1100) = 1 |
-| **Speed 2** | Manual mode, speed_manual (1100) = 2 |
-| **Speed 3** | Manual mode, speed_manual (1100) = 3 |
-| **Boost** | Manual mode, speed_manual (1100) = 4 |
-| **Standby** | Manual mode, speed_manual (1100) = 0 |
+| **Auto** | REG 1102 = `1` — schedule / auto ventilation |
+| **Speed 1–3** | REG 1102 = manual, REG **1100** = `1`..`3` (per Modbus table) |
+| **Boost** | Manual mode + **OVR**: REG **1111** = `1`, REG **1112** = `30` (minutes, default) |
+| **Standby** | REG **1000** = `0` (C4 stop) |
 
-Selecting any preset while the unit is off will power it on first.
+Presets and the fan UI use **REG 1101** (actual level) for the current speed: the unit can show **0** or **4** there when external logic or OVR applies, even though **1100** only accepts **1..3** for manual commands.
+
+Selecting Speed / Auto / Boost while the unit is off powers it on first. **Standby** stops the AHU (same as fan off).
 
 ---
 
@@ -121,14 +121,18 @@ pytest --tb=short
 |---|---|---|---|
 | 1000 | Power status | R/W | 0=off, 1=on |
 | 1001 | Season | R/W | 0=summer, 1=winter |
-| 1007 | Service flags | R | bit 14 = service required |
-| 1100 | Manual speed | R/W | 0=standby, 1–3=levels, 4=boost |
-| 1101 | Actual speed | R | same encoding |
+| 1007 | Alarm status (warnings) | R | binary; bit **14** (`0x4000`) = service required |
+| 1100 | Manual ventilation level | R/W | **1..3** (commanded); actual **0..4** on **1101** |
+| 1101 | Ventilation level (current) | R | 0..4 (standby / levels / override) |
 | 1102 | Mode | R/W | 0=manual, 1=auto |
+| 1111 | OVR enable | R/W | 1 = enabled (used for Boost preset) |
+| 1112 | OVR time | R/W | 1..90 minutes |
 | 1200 | Supply temp | R | signed int16 ÷ 10 → °C |
-| 1201 | Setpoint temp | R | signed int16 ÷ 10 → °C |
+| 1201 | Setpoint temp | R/W | int16 ÷ 10 → °C; documented **0..30 °C** (0..300 tenths) |
 
 All addresses are 1-based (as in the C4 manual); frames send `addr − 1`.
+
+Detailed OCR of the manufacturer tables: `docs/komfovent_c4_modbus_ocr.md`.
 
 ---
 

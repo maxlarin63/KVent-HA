@@ -3,7 +3,7 @@
 DOMAIN = "kvent"
 
 # Integration version (also mirrored in manifest.json)
-INTEGRATION_VERSION = "0.0.15"
+INTEGRATION_VERSION = "0.0.17"
 
 # Config entry keys
 CONF_HOST = "host"
@@ -19,15 +19,23 @@ DEFAULT_SCAN_INTERVAL = 5
 # ──────────────────────────────────────────────
 REG_STATUS = 1000        # R/W  0=off, 1=on
 REG_SEASON = 1001        # R/W  0=summer, 1=winter
-REG_SERVICE = 1007       # R    bitfield – bit 14 (0x4000) = service required
-REG_SPEED_MANUAL = 1100  # R/W  0=standby, 1–3=levels, 4=boost (manual mode target)
-REG_SPEED = 1101         # R    actual current speed (same encoding)
+REG_SERVICE = 1007       # R    alarm warnings (binary) — bit 14 = 0x4000 ⇒ service required
+REG_SPEED_MANUAL = 1100  # R/W  manual level 1–3 only (per table); 0/4 appear on 1101
+REG_SPEED = 1101         # R    actual level 0–4 (standby / 1–3 / override)
 REG_MODE = 1102          # R/W  0=manual, 1=auto
 REG_SUPPLY_TEMP = 1200   # R    signed int16 / 10 → °C
-REG_SETPOINT = 1201      # R/W  signed int16 / 10 → °C
+REG_SETPOINT = 1201      # R/W  signed int16 / 10 → °C; doc range 0..300 (0–30 °C)
+REG_OVR_ENABLE = 1111    # R/W  OVR enable — 1 = enabled (Boost preset)
+REG_OVR_TIME = 1112      # R/W  OVR duration 1..90 minutes
 
-# Service register bitmask
-SERVICE_BIT_MASK = 0x4000  # bit 14
+# 1007 is typed “binary” in the manual; bit 14 encodes service required
+SERVICE_BIT_MASK = 0x4000
+
+# Default OVR duration when activating Boost (register 1112, minutes)
+DEFAULT_OVR_MINUTES = 30
+
+# Setpoint on wire: tenths of °C, documented 0..300 (0–30 °C)
+SETPOINT_TENTHS_MAX = 300
 
 # ──────────────────────────────────────────────
 # Mode values

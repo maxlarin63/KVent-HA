@@ -2,13 +2,11 @@
 
 One fan entity per config entry.  Controls:
   - Power on/off  (REG_STATUS 1000)
-  - Preset modes  (REG_MODE 1102 + REG_SPEED_MANUAL 1100):
-      "Auto"    → mode = 1 (auto ventilation)
-      "Speed 1" → mode = 0, speed_manual = 1
-      "Speed 2" → mode = 0, speed_manual = 2
-      "Speed 3" → mode = 0, speed_manual = 3
-      "Boost"   → mode = 0, speed_manual = 4
-      "Standby" → mode = 0, speed_manual = 0
+  - Preset modes: UI reflects actual ventilation level from REG_SPEED (1101).
+      "Auto"     → mode = 1
+      "Speed 1–3" → manual mode + write 1–3 to REG_SPEED_MANUAL (1100)
+      "Boost"    → manual mode + OVR enable/time (1111 / 1112)
+      "Standby"  → REG_STATUS 0 (C4 stop)
 """
 from __future__ import annotations
 
@@ -83,7 +81,7 @@ class KVentFan(CoordinatorEntity[KVentCoordinator], FanEntity):
             return None
         if data.mode == MODE_AUTO:
             return PRESET_AUTO
-        return FAN_STATE_TO_PRESET.get((MODE_MANUAL, data.speed_manual))
+        return FAN_STATE_TO_PRESET.get((MODE_MANUAL, data.speed))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

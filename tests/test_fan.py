@@ -92,7 +92,7 @@ def test_preset_auto():
     (SPEED_BOOST, PRESET_BOOST),
 ])
 def test_preset_manual_speeds(speed, expected):
-    fan, _ = _make_fan(_make_data(power=True, mode=MODE_MANUAL, speed_manual=speed))
+    fan, _ = _make_fan(_make_data(power=True, mode=MODE_MANUAL, speed=speed))
     assert fan.preset_mode == expected
 
 

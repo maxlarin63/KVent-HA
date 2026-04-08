@@ -25,8 +25,8 @@ SETPOINT_DESCRIPTION = NumberEntityDescription(
     name="Temperature setpoint",
     device_class=NumberDeviceClass.TEMPERATURE,
     native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-    native_min_value=5.0,
-    native_max_value=35.0,
+    native_min_value=0.0,
+    native_max_value=30.0,
     native_step=0.5,
     mode=NumberMode.BOX,
 )

@@ -15,6 +15,8 @@ import logging
 import struct
 from dataclasses import dataclass
 
+from .const import SERVICE_BIT_MASK, SETPOINT_TENTHS_MAX
+
 _LOGGER = logging.getLogger(__name__)
 
 # Modbus exception 0x06 = Slave Device Busy (transient; device asks master to retry later).
@@ -36,9 +38,9 @@ class KVentData:
 
     power: bool           # REG_STATUS  (1000)
     season: int           # REG_SEASON  (1001)  0=summer, 1=winter
-    service: bool         # REG_SERVICE (1007)  True when bit 14 is set
-    speed_manual: int     # REG_SPEED_MANUAL (1100)  0–4
-    speed: int            # REG_SPEED        (1101)  0–4 (actual)
+    service: bool         # REG_SERVICE (1007)  binary: bit 14 set ⇒ service required
+    speed_manual: int     # REG_SPEED_MANUAL (1100)  commanded 1–3 (table); read-back only
+    speed: int            # REG_SPEED        (1101)  0–4 actual level
     mode: int             # REG_MODE         (1102)  0=manual, 1=auto
     supply_temp: float    # REG_SUPPLY_TEMP  (1200)  °C (signed / 10)
     setpoint: float       # REG_SETPOINT     (1201)  °C (signed / 10)
@@ -68,9 +70,9 @@ def _decode_signed16(raw: int) -> float:
 
 
 def encode_setpoint_register(celsius: float) -> int:
-    """Encode setpoint °C for Modbus holding register 1201 (signed int16, tenths of °C on wire)."""
+    """Encode setpoint °C for holding register 1201 (tenths of °C; documented range 0..300)."""
     tenths = int(round(celsius * 10))
-    tenths = max(-32768, min(32767, tenths))
+    tenths = max(0, min(SETPOINT_TENTHS_MAX, tenths))
     return tenths & 0xFFFF
 
 
@@ -227,7 +229,7 @@ class KVentModbusClient:
         return KVentData(
             power=b1[0] == 1,
             season=b1[1],
-            service=bool(b2[0] & 0x4000),
+            service=bool(b2[0] & SERVICE_BIT_MASK),
             speed_manual=b3[0],
             speed=b3[1],
             mode=b3[2],

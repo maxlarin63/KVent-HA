@@ -2,6 +2,8 @@
 
 Transcription of the **“Modbus registers of C4 controller”** and **Schedule** tables for cross-check with this integration. Register numbers are **1-based** as in the documentation; Modbus PDU addressing typically uses **register − 1**.
 
+**KVent integration (1007):** The table lists **binary** type and symbolic codes such as “14-Service”. The integration treats **service required** as **bit 14 set** (`value & 0x4000`), consistent with a bitwise interpretation of that binary field.
+
 ---
 
 ## General

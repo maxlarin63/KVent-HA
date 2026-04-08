@@ -68,8 +68,8 @@ class KVentClimate(CoordinatorEntity[KVentCoordinator], ClimateEntity):
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.FAN_ONLY]
     _attr_swing_modes = list(SEASON_OPTIONS)
-    _attr_min_temp = 5.0
-    _attr_max_temp = 35.0
+    _attr_min_temp = 0.0
+    _attr_max_temp = 30.0
     _attr_target_temperature_step = 0.5
     _attr_precision = PRECISION_HALVES
     _attr_supported_features = (
@@ -146,7 +146,7 @@ class KVentClimate(CoordinatorEntity[KVentCoordinator], ClimateEntity):
             return None
         if data.mode == MODE_AUTO:
             return PRESET_AUTO
-        return FAN_STATE_TO_PRESET.get((MODE_MANUAL, data.speed_manual))
+        return FAN_STATE_TO_PRESET.get((MODE_MANUAL, data.speed))
 
     @property
     def swing_mode(self) -> str | None:

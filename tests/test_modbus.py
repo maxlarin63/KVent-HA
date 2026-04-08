@@ -70,11 +70,14 @@ def test_decode_signed16_negative():
 
 def test_encode_setpoint_round_trip():
     assert encode_setpoint_register(20.5) == 205
-    assert _decode_signed16(encode_setpoint_register(-2.5)) == -25.0
+    assert encode_setpoint_register(0.0) == 0
 
 
-def test_encode_setpoint_negative_wire_format():
-    assert encode_setpoint_register(-2.5) == 0xFFE7
+def test_encode_setpoint_clamps_to_documented_range():
+    """REG 1201 documented 0..300 tenths (0–30 °C); writes must not exceed."""
+    assert encode_setpoint_register(35.0) == 300
+    assert encode_setpoint_register(-2.5) == 0
+    assert encode_setpoint_register(25.0) == 250
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -111,7 +114,7 @@ async def test_async_read_all_parses_blocks_correctly():
         if addr == 1000:
             return [1, 1]           # power=ON, season=WINTER
         if addr == 1007:
-            return [0x4000]         # service bit set
+            return [0x4000]         # service: bit 14
         if addr == 1100:
             return [2, 3, 1]        # speed_manual=2, speed=3, mode=AUTO
         if addr == 1200:
