@@ -18,6 +18,8 @@ communicating over **Modbus TCP**.
 
 No external Python dependencies — pure `asyncio` socket I/O.
 
+**Integration version:** see `custom_components/kvent/manifest.json` (`version`) and `custom_components/kvent/const.py` (`INTEGRATION_VERSION`) — they should match.
+
 ---
 
 ## GitHub repository settings (HACS / validation)
