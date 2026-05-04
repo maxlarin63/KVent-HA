@@ -20,6 +20,48 @@
     "version": "2.0.0",
     "tasks": [
       {
+        "label": "Ensure venv",
+        "detail": "No-op if .venv exists; otherwise create it (Python 3.12) and install requirements-dev.txt. Wired as a dependsOn for Run tests and Lint (ruff).",
+        "type": "shell",
+        "command": "powershell",
+        "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\scripts\\ensure-venv.ps1"],
+        "windows": {
+          "command": "powershell",
+          "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\scripts\\ensure-venv.ps1"]
+        },
+        "linux": {
+          "command": "bash",
+          "args": ["${workspaceFolder}/scripts/ensure-venv.sh"]
+        },
+        "osx": {
+          "command": "bash",
+          "args": ["${workspaceFolder}/scripts/ensure-venv.sh"]
+        },
+        "group": "build",
+        "presentation": { "reveal": "silent", "panel": "shared", "showReuseMessage": false }
+      },
+      {
+        "label": "Recreate venv",
+        "detail": "Delete .venv if present, then create a fresh one (Python 3.12) and install requirements-dev.txt. Use after upgrading Python or when requirements-dev.txt changes.",
+        "type": "shell",
+        "command": "powershell",
+        "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\scripts\\recreate-venv.ps1"],
+        "windows": {
+          "command": "powershell",
+          "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\scripts\\recreate-venv.ps1"]
+        },
+        "linux": {
+          "command": "bash",
+          "args": ["${workspaceFolder}/scripts/recreate-venv.sh"]
+        },
+        "osx": {
+          "command": "bash",
+          "args": ["${workspaceFolder}/scripts/recreate-venv.sh"]
+        },
+        "group": "build",
+        "presentation": { "reveal": "always", "panel": "shared" }
+      },
+      {
         "label": "Deploy to HA (rsync / WSL)",
         "type": "shell",
         "command": "bash scripts/deploy-ha-rsync.sh",
@@ -40,27 +82,31 @@
         "presentation": { "reveal": "always", "panel": "shared" }
       },
       {
-        "label": "Run Tests",
+        "label": "Run tests",
         "type": "shell",
-        "command": ".venv/bin/pytest --tb=short",
+        "command": ".venv/bin/python -m pytest --tb=short",
         "windows": {
-          "command": ".venv\\Scripts\\pytest --tb=short"
+          "command": ".venv\\Scripts\\python.exe -m pytest --tb=short"
         },
+        "dependsOrder": "sequence",
+        "dependsOn": ["Ensure venv"],
         "group": { "kind": "test", "isDefault": true },
         "presentation": { "reveal": "always", "panel": "shared" }
       },
       {
         "label": "Lint (ruff)",
         "type": "shell",
-        "command": ".venv/bin/ruff check custom_components/",
+        "command": ".venv/bin/python -m ruff check custom_components/",
         "windows": {
-          "command": ".venv\\Scripts\\ruff check custom_components\\"
+          "command": ".venv\\Scripts\\python.exe -m ruff check custom_components/"
         },
+        "dependsOrder": "sequence",
+        "dependsOn": ["Ensure venv"],
         "group": "build",
         "presentation": { "reveal": "always", "panel": "shared" }
       },
       {
-        "label": "Clean",
+        "label": "Clean caches",
         "type": "shell",
         "command": "bash scripts/clean.sh",
         "windows": {
