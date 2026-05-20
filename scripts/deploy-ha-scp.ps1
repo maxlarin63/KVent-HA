@@ -37,7 +37,10 @@ if (Test-Path $ManifestPath) {
     }
 }
 
-$SshArgs = @("-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes")
+# Pin MACs=hmac-sha2-256-etm: Advanced SSH addon offers umac-128-etm first
+# and Windows OpenSSH picks it by default, but that pairing reliably corrupts
+# MAC mid-stream ("Corrupted MAC on input"). SHA-256 EtM is clean.
+$SshArgs = @("-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes", "-o", "MACs=hmac-sha2-256-etm@openssh.com")
 if ($IDENTITY) { $SshArgs += @("-i", $IDENTITY) }
 
 if ($Version) {

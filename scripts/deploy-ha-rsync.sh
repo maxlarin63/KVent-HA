@@ -18,7 +18,10 @@ HA_HOST="${HA_HOST:?HA_HOST not set in .env.ha}"
 HA_USER="${HA_USER:-root}"
 DEST="/config/custom_components/kvent"
 
-SSH_OPTS=(-o StrictHostKeyChecking=no -o BatchMode=yes)
+# Pin MACs=hmac-sha2-256-etm: Advanced SSH addon offers umac-128-etm first
+# and some OpenSSH clients pick it by default, but that pairing reliably
+# corrupts MAC mid-stream ("Corrupted MAC on input"). SHA-256 EtM is clean.
+SSH_OPTS=(-o StrictHostKeyChecking=no -o BatchMode=yes -o MACs=hmac-sha2-256-etm@openssh.com)
 if [[ -n "${HA_SSH_IDENTITY:-}" ]]; then
   SSH_OPTS+=(-i "$HA_SSH_IDENTITY")
 fi
