@@ -151,9 +151,17 @@ class KVentModbusClient:
 
         assert self._reader is not None  # noqa: S101
         header = await asyncio.wait_for(self._reader.readexactly(6), timeout=_IO_TIMEOUT)
-        _resp_tid, _proto, length = struct.unpack(">HHH", header)
+        resp_tid, _proto, length = struct.unpack(">HHH", header)
 
         body = await asyncio.wait_for(self._reader.readexactly(length), timeout=_IO_TIMEOUT)
+        # Stale / out-of-order frames otherwise silently masquerade as the current
+        # response (observed cause of spurious REG_STATUS=0 reads).
+        if resp_tid != tid:
+            _LOGGER.warning(
+                "KVent: modbus TID mismatch on read addr %s: sent=%s got=%s header=%s body=%s",
+                addr, tid, resp_tid, header.hex(), body.hex(),
+            )
+            raise OSError(f"Modbus TID mismatch: sent {tid}, got {resp_tid}")
         # body layout: [unit_id][func][byte_count][data...] or exception: [unit][func|0x80][ex_code]
         _parse_read_exception(addr, body)
         func = body[1]
@@ -161,6 +169,13 @@ class KVentModbusClient:
             raise OSError(f"Unexpected function code {func:#x}, expected {_FUNC_READ:#x}")
 
         byte_count = body[2]
+        expected = count * 2
+        if byte_count != expected:
+            _LOGGER.warning(
+                "KVent: modbus byte_count mismatch on read addr %s: expected=%s got=%s body=%s",
+                addr, expected, byte_count, body.hex(),
+            )
+            raise OSError(f"Modbus byte_count mismatch: expected {expected}, got {byte_count}")
         return [
             struct.unpack_from(">H", body, 3 + i * 2)[0]
             for i in range(byte_count // 2)
@@ -207,6 +222,13 @@ class KVentModbusClient:
 
             assert self._reader is not None  # noqa: S101
             resp = await asyncio.wait_for(self._reader.readexactly(12), timeout=_IO_TIMEOUT)
+            resp_tid = struct.unpack(">H", resp[0:2])[0]
+            if resp_tid != tid:
+                _LOGGER.warning(
+                    "KVent: modbus TID mismatch on write addr %s: sent=%s got=%s frame=%s",
+                    addr, tid, resp_tid, resp.hex(),
+                )
+                raise OSError(f"Modbus TID mismatch on write: sent {tid}, got {resp_tid}")
             func = resp[7]
             if func & 0x80:
                 raise OSError(f"Modbus write exception code {resp[8]:#x} for addr {addr}")

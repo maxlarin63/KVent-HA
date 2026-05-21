@@ -3,7 +3,7 @@
 DOMAIN = "kvent"
 
 # Integration version (also mirrored in manifest.json)
-INTEGRATION_VERSION = "0.0.19"
+INTEGRATION_VERSION = "0.0.20"
 
 # Config entry keys
 CONF_HOST = "host"
