@@ -55,15 +55,25 @@ class KVentCoordinator(DataUpdateCoordinator[KVentData]):
 
     async def _async_update_data(self) -> KVentData:
         """Fetch register snapshot; reconnect once on failure."""
+        prev = self.data
         try:
-            return await asyncio.wait_for(self._client.async_read_all(), timeout=20.0)
+            new = await asyncio.wait_for(self._client.async_read_all(), timeout=20.0)
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("KVent poll failed (%s), retrying after reconnect", err)
             try:
                 await self._client.disconnect()
-                return await asyncio.wait_for(self._client.async_read_all(), timeout=20.0)
+                new = await asyncio.wait_for(self._client.async_read_all(), timeout=20.0)
             except Exception as retry_err:
                 raise UpdateFailed(f"Modbus read failed: {retry_err}") from retry_err
+        # Diagnostic for off/on cycling: surface full snapshot at every power flip.
+        if prev is not None and prev.power != new.power:
+            _LOGGER.warning(
+                "KVent power transition %s→%s, snapshot=%s",
+                prev.power,
+                new.power,
+                new,
+            )
+        return new
 
     # ── Write helpers ─────────────────────────────────────────────────────────
 
