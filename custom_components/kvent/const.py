@@ -3,7 +3,7 @@
 DOMAIN = "kvent"
 
 # Integration version (also mirrored in manifest.json)
-INTEGRATION_VERSION = "0.0.20"
+INTEGRATION_VERSION = "0.0.21"
 
 # Config entry keys
 CONF_HOST = "host"
@@ -20,9 +20,12 @@ DEFAULT_SCAN_INTERVAL = 5
 REG_STATUS = 1000        # R/W  0=off, 1=on
 REG_SEASON = 1001        # R/W  0=summer, 1=winter
 REG_SERVICE = 1007       # R    alarm warnings (binary) — bit 14 = 0x4000 ⇒ service required
+REG_ALARM_STOP_FLAGS = 1008  # R  binary stop-condition bits (sensor / heater / frost / rotor / air-temp)
+REG_ALARM_STOP_CODE = 1009   # R  integer stop reason code (0 = no stop)
 REG_SPEED_MANUAL = 1100  # R/W  manual level 1–3 only (per table); 0/4 appear on 1101
 REG_SPEED = 1101         # R    actual level 0–4 (standby / 1–3 / override)
 REG_MODE = 1102          # R/W  0=manual, 1=auto
+REG_FANS_STATUS = 1114   # R    1=operating, 0=stopped (independent of REG_STATUS)
 REG_SUPPLY_TEMP = 1200   # R    signed int16 / 10 → °C
 REG_SETPOINT = 1201      # R/W  signed int16 / 10 → °C; doc range 0..300 (0–30 °C)
 REG_OVR_ENABLE = 1111    # R/W  OVR enable — 1 = enabled (Boost preset)
