@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import replace
 from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
@@ -65,6 +66,13 @@ class KVentCoordinator(DataUpdateCoordinator[KVentData]):
                 new = await asyncio.wait_for(self._client.async_read_all(), timeout=20.0)
             except Exception as retry_err:
                 raise UpdateFailed(f"Modbus read failed: {retry_err}") from retry_err
+        # C4 firmware briefly reports REG_STATUS=0 while fans keep operating and no
+        # stop code is set. Trust REG_FANS_STATUS as the actual run-state in that case.
+        if not new.power and new.fans_running and new.alarm_stop_code == 0:
+            _LOGGER.debug(
+                "KVent: REG_STATUS=0 ignored — fans still operating (snapshot=%s)", new
+            )
+            new = replace(new, power=True)
         # Diagnostic for off/on cycling: surface full snapshot at every power flip.
         if prev is not None and prev.power != new.power:
             _LOGGER.warning(

@@ -1,7 +1,7 @@
 {
   "domain": "kvent",
   "name": "KVent (Komfovent C4)",
-  "version": "0.0.21",
+  "version": "0.0.22",
   "codeowners": ["@maxlarin63"],
   "config_flow": true,
   "documentation": "https://github.com/maxlarin63/KVent-HA",
