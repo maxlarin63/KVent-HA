@@ -15,7 +15,12 @@ import logging
 import struct
 from dataclasses import dataclass
 
-from .const import SERVICE_BIT_MASK, SETPOINT_TENTHS_MAX
+from .const import (
+    SERVICE_BIT_MASK,
+    SETPOINT_TENTHS_MAX,
+    SUPPLY_TEMP_MAX_C,
+    SUPPLY_TEMP_MIN_C,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -253,6 +258,19 @@ class KVentModbusClient:
         # Block 5 – 1200..1201 (supply_temp, setpoint)
         b5 = await self.read_registers(1200, 2)
 
+        supply_temp = _decode_signed16(b5[0]) / 10.0
+        setpoint = _decode_signed16(b5[1]) / 10.0
+        # Diagnostic: documented sensor range is -30..75 °C. A decoded value
+        # outside is a wire / parse glitch — log raw hex so we can correlate.
+        if not SUPPLY_TEMP_MIN_C <= supply_temp <= SUPPLY_TEMP_MAX_C:
+            _LOGGER.warning(
+                "KVent: supply_temp out of range: decoded=%.1f°C raw=0x%04X "
+                "(setpoint raw=0x%04X)",
+                supply_temp,
+                b5[0],
+                b5[1],
+            )
+
         return KVentData(
             power=b1[0] == 1,
             season=b1[1],
@@ -260,8 +278,8 @@ class KVentModbusClient:
             speed_manual=b3[0],
             speed=b3[1],
             mode=b3[2],
-            supply_temp=_decode_signed16(b5[0]) / 10.0,
-            setpoint=_decode_signed16(b5[1]) / 10.0,
+            supply_temp=supply_temp,
+            setpoint=setpoint,
             alarm_stop_flags=b2[1],
             alarm_stop_code=b2[2],
             fans_running=b4[0] == 1,

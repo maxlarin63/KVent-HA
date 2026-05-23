@@ -3,7 +3,7 @@
 DOMAIN = "kvent"
 
 # Integration version (also mirrored in manifest.json)
-INTEGRATION_VERSION = "0.0.22"
+INTEGRATION_VERSION = "0.0.23"
 
 # Config entry keys
 CONF_HOST = "host"
@@ -39,6 +39,11 @@ DEFAULT_OVR_MINUTES = 30
 
 # Setpoint on wire: tenths of °C, documented 0..300 (0–30 °C)
 SETPOINT_TENTHS_MAX = 300
+
+# Supply sensor B1 documented operating range (°C). Used by diagnostic logging
+# when a decoded REG 1200 reading falls outside; values outside are wire/parse glitches.
+SUPPLY_TEMP_MIN_C = -30.0
+SUPPLY_TEMP_MAX_C = 75.0
 
 # ──────────────────────────────────────────────
 # Mode values
