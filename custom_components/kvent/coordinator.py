@@ -22,6 +22,9 @@ from .const import (
     REG_STATUS,
     SPEED_BOOST,
     SPEED_STANDBY,
+    SUPPLY_TEMP_MAX_C,
+    SUPPLY_TEMP_MAX_JUMP_C,
+    SUPPLY_TEMP_MIN_C,
 )
 from .modbus import KVentData, KVentModbusClient, encode_setpoint_register
 
@@ -73,6 +76,24 @@ class KVentCoordinator(DataUpdateCoordinator[KVentData]):
                 "KVent: REG_STATUS=0 ignored — fans still operating (snapshot=%s)", new
             )
             new = replace(new, power=True)
+        # Supply temp sanity: C4 firmware occasionally hands out a glitched REG 1200
+        # (out of documented range, or a physically implausible 1-poll jump).
+        # Carry forward the previous good reading; modbus.py already logs the raw hex.
+        if prev is not None:
+            if not SUPPLY_TEMP_MIN_C <= new.supply_temp <= SUPPLY_TEMP_MAX_C:
+                reason = "out of range"
+            elif abs(new.supply_temp - prev.supply_temp) > SUPPLY_TEMP_MAX_JUMP_C:
+                reason = f"jump > {SUPPLY_TEMP_MAX_JUMP_C}°C"
+            else:
+                reason = None
+            if reason is not None:
+                _LOGGER.warning(
+                    "KVent: supply_temp glitch suppressed (%s): this=%.1f°C prev=%.1f°C",
+                    reason,
+                    new.supply_temp,
+                    prev.supply_temp,
+                )
+                new = replace(new, supply_temp=prev.supply_temp)
         # Diagnostic for off/on cycling: surface full snapshot at every power flip.
         if prev is not None and prev.power != new.power:
             _LOGGER.warning(

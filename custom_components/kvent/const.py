@@ -3,7 +3,7 @@
 DOMAIN = "kvent"
 
 # Integration version (also mirrored in manifest.json)
-INTEGRATION_VERSION = "0.0.23"
+INTEGRATION_VERSION = "0.0.24"
 
 # Config entry keys
 CONF_HOST = "host"
@@ -44,6 +44,11 @@ SETPOINT_TENTHS_MAX = 300
 # when a decoded REG 1200 reading falls outside; values outside are wire/parse glitches.
 SUPPLY_TEMP_MIN_C = -30.0
 SUPPLY_TEMP_MAX_C = 75.0
+
+# Physically implausible supply-air change between two consecutive 5 s polls.
+# Used by the coordinator to suppress in-range glitches (e.g. a single sample
+# of 0.0 °C amid steady 25 °C readings).
+SUPPLY_TEMP_MAX_JUMP_C = 5.0
 
 # ──────────────────────────────────────────────
 # Mode values
