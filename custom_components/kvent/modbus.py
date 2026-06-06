@@ -15,7 +15,12 @@ import logging
 import struct
 from dataclasses import dataclass
 
-from .const import SERVICE_BIT_MASK, SETPOINT_TENTHS_MAX
+from .const import (
+    SERVICE_BIT_MASK,
+    SETPOINT_TENTHS_MAX,
+    SUPPLY_TEMP_MAX_C,
+    SUPPLY_TEMP_MIN_C,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,6 +49,9 @@ class KVentData:
     mode: int             # REG_MODE         (1102)  0=manual, 1=auto
     supply_temp: float    # REG_SUPPLY_TEMP  (1200)  °C (signed / 10)
     setpoint: float       # REG_SETPOINT     (1201)  °C (signed / 10)
+    alarm_stop_flags: int = 0  # REG 1008 — bitmask of active stop conditions
+    alarm_stop_code: int = 0   # REG 1009 — most recent stop reason code
+    fans_running: bool = True  # REG 1114 — actual fan state (1=operating)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -151,9 +159,17 @@ class KVentModbusClient:
 
         assert self._reader is not None  # noqa: S101
         header = await asyncio.wait_for(self._reader.readexactly(6), timeout=_IO_TIMEOUT)
-        _resp_tid, _proto, length = struct.unpack(">HHH", header)
+        resp_tid, _proto, length = struct.unpack(">HHH", header)
 
         body = await asyncio.wait_for(self._reader.readexactly(length), timeout=_IO_TIMEOUT)
+        # Stale / out-of-order frames otherwise silently masquerade as the current
+        # response (observed cause of spurious REG_STATUS=0 reads).
+        if resp_tid != tid:
+            _LOGGER.warning(
+                "KVent: modbus TID mismatch on read addr %s: sent=%s got=%s header=%s body=%s",
+                addr, tid, resp_tid, header.hex(), body.hex(),
+            )
+            raise OSError(f"Modbus TID mismatch: sent {tid}, got {resp_tid}")
         # body layout: [unit_id][func][byte_count][data...] or exception: [unit][func|0x80][ex_code]
         _parse_read_exception(addr, body)
         func = body[1]
@@ -161,6 +177,13 @@ class KVentModbusClient:
             raise OSError(f"Unexpected function code {func:#x}, expected {_FUNC_READ:#x}")
 
         byte_count = body[2]
+        expected = count * 2
+        if byte_count != expected:
+            _LOGGER.warning(
+                "KVent: modbus byte_count mismatch on read addr %s: expected=%s got=%s body=%s",
+                addr, expected, byte_count, body.hex(),
+            )
+            raise OSError(f"Modbus byte_count mismatch: expected {expected}, got {byte_count}")
         return [
             struct.unpack_from(">H", body, 3 + i * 2)[0]
             for i in range(byte_count // 2)
@@ -207,6 +230,13 @@ class KVentModbusClient:
 
             assert self._reader is not None  # noqa: S101
             resp = await asyncio.wait_for(self._reader.readexactly(12), timeout=_IO_TIMEOUT)
+            resp_tid = struct.unpack(">H", resp[0:2])[0]
+            if resp_tid != tid:
+                _LOGGER.warning(
+                    "KVent: modbus TID mismatch on write addr %s: sent=%s got=%s frame=%s",
+                    addr, tid, resp_tid, resp.hex(),
+                )
+                raise OSError(f"Modbus TID mismatch on write: sent {tid}, got {resp_tid}")
             func = resp[7]
             if func & 0x80:
                 raise OSError(f"Modbus write exception code {resp[8]:#x} for addr {addr}")
@@ -216,15 +246,30 @@ class KVentModbusClient:
     # ── High-level poll ───────────────────────────────────────────────────────
 
     async def async_read_all(self) -> KVentData:
-        """Read the full KVent register snapshot in four contiguous blocks."""
+        """Read the full KVent register snapshot in five contiguous blocks."""
         # Block 1 – 1000..1001 (status, season)
         b1 = await self.read_registers(1000, 2)
-        # Block 2 – 1007       (service bitfield)
-        b2 = await self.read_registers(1007, 1)
+        # Block 2 – 1007..1009 (service warnings, alarm stop flags, alarm stop code)
+        b2 = await self.read_registers(1007, 3)
         # Block 3 – 1100..1102 (speed_manual, speed, mode)
         b3 = await self.read_registers(1100, 3)
-        # Block 4 – 1200..1201 (supply_temp, setpoint)
-        b4 = await self.read_registers(1200, 2)
+        # Block 4 – 1114       (actual AHU fans status, independent of REG_STATUS)
+        b4 = await self.read_registers(1114, 1)
+        # Block 5 – 1200..1201 (supply_temp, setpoint)
+        b5 = await self.read_registers(1200, 2)
+
+        supply_temp = _decode_signed16(b5[0]) / 10.0
+        setpoint = _decode_signed16(b5[1]) / 10.0
+        # Diagnostic: documented sensor range is -30..75 °C. A decoded value
+        # outside is a wire / parse glitch — log raw hex so we can correlate.
+        if not SUPPLY_TEMP_MIN_C <= supply_temp <= SUPPLY_TEMP_MAX_C:
+            _LOGGER.warning(
+                "KVent: supply_temp out of range: decoded=%.1f°C raw=0x%04X "
+                "(setpoint raw=0x%04X)",
+                supply_temp,
+                b5[0],
+                b5[1],
+            )
 
         return KVentData(
             power=b1[0] == 1,
@@ -233,6 +278,9 @@ class KVentModbusClient:
             speed_manual=b3[0],
             speed=b3[1],
             mode=b3[2],
-            supply_temp=_decode_signed16(b4[0]) / 10.0,
-            setpoint=_decode_signed16(b4[1]) / 10.0,
+            supply_temp=supply_temp,
+            setpoint=setpoint,
+            alarm_stop_flags=b2[1],
+            alarm_stop_code=b2[2],
+            fans_running=b4[0] == 1,
         )

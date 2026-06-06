@@ -17,7 +17,9 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          REF="${GITHUB_REF_NAME}"
+          # On pull_request events GITHUB_REF_NAME is "<PR>/merge", which
+          # isn't a real ref. Prefer the source branch in that case.
+          REF="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
           RAW_URL="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${REF}/hacs.json"
           RAW_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$RAW_URL" || echo "000")
           if [ "$RAW_CODE" = "200" ]; then

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import replace
 from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
@@ -21,6 +22,9 @@ from .const import (
     REG_STATUS,
     SPEED_BOOST,
     SPEED_STANDBY,
+    SUPPLY_TEMP_MAX_C,
+    SUPPLY_TEMP_MAX_JUMP_C,
+    SUPPLY_TEMP_MIN_C,
 )
 from .modbus import KVentData, KVentModbusClient, encode_setpoint_register
 
@@ -55,15 +59,50 @@ class KVentCoordinator(DataUpdateCoordinator[KVentData]):
 
     async def _async_update_data(self) -> KVentData:
         """Fetch register snapshot; reconnect once on failure."""
+        prev = self.data
         try:
-            return await asyncio.wait_for(self._client.async_read_all(), timeout=20.0)
+            new = await asyncio.wait_for(self._client.async_read_all(), timeout=20.0)
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("KVent poll failed (%s), retrying after reconnect", err)
             try:
                 await self._client.disconnect()
-                return await asyncio.wait_for(self._client.async_read_all(), timeout=20.0)
+                new = await asyncio.wait_for(self._client.async_read_all(), timeout=20.0)
             except Exception as retry_err:
                 raise UpdateFailed(f"Modbus read failed: {retry_err}") from retry_err
+        # C4 firmware briefly reports REG_STATUS=0 while fans keep operating and no
+        # stop code is set. Trust REG_FANS_STATUS as the actual run-state in that case.
+        if not new.power and new.fans_running and new.alarm_stop_code == 0:
+            _LOGGER.debug(
+                "KVent: REG_STATUS=0 ignored — fans still operating (snapshot=%s)", new
+            )
+            new = replace(new, power=True)
+        # Supply temp sanity: C4 firmware occasionally hands out a glitched REG 1200
+        # (out of documented range, or a physically implausible 1-poll jump).
+        # Carry forward the previous good reading; modbus.py already logs the raw hex.
+        if prev is not None:
+            if not SUPPLY_TEMP_MIN_C <= new.supply_temp <= SUPPLY_TEMP_MAX_C:
+                reason = "out of range"
+            elif abs(new.supply_temp - prev.supply_temp) > SUPPLY_TEMP_MAX_JUMP_C:
+                reason = f"jump > {SUPPLY_TEMP_MAX_JUMP_C}°C"
+            else:
+                reason = None
+            if reason is not None:
+                _LOGGER.warning(
+                    "KVent: supply_temp glitch suppressed (%s): this=%.1f°C prev=%.1f°C",
+                    reason,
+                    new.supply_temp,
+                    prev.supply_temp,
+                )
+                new = replace(new, supply_temp=prev.supply_temp)
+        # Diagnostic for off/on cycling: surface full snapshot at every power flip.
+        if prev is not None and prev.power != new.power:
+            _LOGGER.warning(
+                "KVent power transition %s→%s, snapshot=%s",
+                prev.power,
+                new.power,
+                new,
+            )
+        return new
 
     # ── Write helpers ─────────────────────────────────────────────────────────
 

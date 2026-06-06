@@ -107,18 +107,20 @@ def test_kvent_data_fields():
 
 @pytest.mark.asyncio
 async def test_async_read_all_parses_blocks_correctly():
-    """async_read_all must correctly combine four read_registers calls."""
+    """async_read_all must correctly combine five read_registers calls."""
     client = KVentModbusClient("127.0.0.1", 502)
 
     async def fake_read(addr, count):
         if addr == 1000:
-            return [1, 1]           # power=ON, season=WINTER
+            return [1, 1]                # power=ON, season=WINTER
         if addr == 1007:
-            return [0x4000]         # service: bit 14
+            return [0x4000, 0x0020, 5]   # service bit 14; stop flags bit 5 (frost); stop code 5
         if addr == 1100:
-            return [2, 3, 1]        # speed_manual=2, speed=3, mode=AUTO
+            return [2, 3, 1]             # speed_manual=2, speed=3, mode=AUTO
+        if addr == 1114:
+            return [1]                   # fans operating
         if addr == 1200:
-            return [0x00C8, 0x00FA] # supply=200→20.0, setpoint=250→25.0
+            return [0x00C8, 0x00FA]      # supply=200→20.0, setpoint=250→25.0
         return []
 
     client.read_registers = fake_read
@@ -133,6 +135,9 @@ async def test_async_read_all_parses_blocks_correctly():
     assert data.mode == 1
     assert data.supply_temp == pytest.approx(20.0)
     assert data.setpoint == pytest.approx(25.0)
+    assert data.alarm_stop_flags == 0x0020
+    assert data.alarm_stop_code == 5
+    assert data.fans_running is True
 
 
 @pytest.mark.asyncio
@@ -144,9 +149,11 @@ async def test_async_read_all_negative_temperature():
         if addr == 1000:
             return [0, 0]
         if addr == 1007:
-            return [0]
+            return [0, 0, 0]
         if addr == 1100:
             return [0, 0, 0]
+        if addr == 1114:
+            return [0]
         if addr == 1200:
             # -50 = 0xFFCE, -30 = 0xFFE2 (raw); /10 → -5.0, -3.0 °C
             return [0xFFCE, 0xFFE2]
@@ -157,3 +164,4 @@ async def test_async_read_all_negative_temperature():
 
     assert data.supply_temp == pytest.approx(-5.0)
     assert data.setpoint == pytest.approx(-3.0)
+    assert data.fans_running is False
