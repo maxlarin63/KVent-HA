@@ -3,7 +3,7 @@
 DOMAIN = "kvent"
 
 # Integration version (also mirrored in manifest.json)
-INTEGRATION_VERSION = "0.0.24"
+INTEGRATION_VERSION = "0.0.25"
 
 # Config entry keys
 CONF_HOST = "host"
@@ -13,6 +13,14 @@ CONF_SCAN_INTERVAL = "scan_interval"
 # Defaults
 DEFAULT_PORT = 502
 DEFAULT_SCAN_INTERVAL = 5
+
+# Consecutive failed polls tolerated before entities go `unavailable`. A single
+# transient read/connect timeout otherwise flaps every entity to unavailable for
+# one cycle; the recovery edge (unavailable→on) then fires users' "turned on"
+# automations even though the C4 never changed state. We carry the last-good
+# snapshot forward for up to this many consecutive failures (~grace × scan_interval
+# seconds) and only surface UpdateFailed once the outage is sustained.
+POLL_FAILURE_GRACE = 3
 
 # ──────────────────────────────────────────────
 # Modbus register addresses (1-based, as in Komfovent C4 manual)
