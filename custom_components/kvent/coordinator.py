@@ -13,6 +13,7 @@ from .const import (
     DEFAULT_OVR_MINUTES,
     DOMAIN,
     MODE_MANUAL,
+    POLL_FAILURE_GRACE,
     REG_MODE,
     REG_OVR_ENABLE,
     REG_OVR_TIME,
@@ -48,6 +49,7 @@ class KVentCoordinator(DataUpdateCoordinator[KVentData]):
             update_interval=timedelta(seconds=scan_interval),
         )
         self._client = KVentModbusClient(host, port)
+        self._consecutive_failures = 0
 
     # ── Coordinator lifecycle ─────────────────────────────────────────────────
 
@@ -58,7 +60,7 @@ class KVentCoordinator(DataUpdateCoordinator[KVentData]):
     # ── Poll ──────────────────────────────────────────────────────────────────
 
     async def _async_update_data(self) -> KVentData:
-        """Fetch register snapshot; reconnect once on failure."""
+        """Fetch register snapshot; reconnect once on failure, tolerate brief blips."""
         prev = self.data
         try:
             new = await asyncio.wait_for(self._client.async_read_all(), timeout=20.0)
@@ -67,8 +69,10 @@ class KVentCoordinator(DataUpdateCoordinator[KVentData]):
             try:
                 await self._client.disconnect()
                 new = await asyncio.wait_for(self._client.async_read_all(), timeout=20.0)
-            except Exception as retry_err:
-                raise UpdateFailed(f"Modbus read failed: {retry_err}") from retry_err
+            except Exception as retry_err:  # noqa: BLE001
+                return self._tolerate_or_fail(prev, retry_err)
+        # Poll succeeded — clear the carry-forward grace counter.
+        self._consecutive_failures = 0
         # C4 firmware briefly reports REG_STATUS=0 while fans keep operating and no
         # stop code is set. Trust REG_FANS_STATUS as the actual run-state in that case.
         if not new.power and new.fans_running and new.alarm_stop_code == 0:
@@ -103,6 +107,27 @@ class KVentCoordinator(DataUpdateCoordinator[KVentData]):
                 new,
             )
         return new
+
+    def _tolerate_or_fail(self, prev: KVentData | None, err: Exception) -> KVentData:
+        """Carry the last-good snapshot forward for a few consecutive failures.
+
+        A single failed poll otherwise flaps every entity to ``unavailable``; the
+        recovery edge (unavailable→on) then fires users' "turned on" automations
+        even though the C4 never changed state. Absorb up to ``POLL_FAILURE_GRACE``
+        consecutive failures, surfacing ``UpdateFailed`` only once the outage is
+        sustained (or immediately if we have no prior snapshot to fall back on).
+        """
+        self._consecutive_failures += 1
+        if prev is not None and self._consecutive_failures <= POLL_FAILURE_GRACE:
+            _LOGGER.warning(
+                "KVent: poll failed (%s), carrying forward last-good snapshot "
+                "(failure %s/%s before going unavailable)",
+                err,
+                self._consecutive_failures,
+                POLL_FAILURE_GRACE,
+            )
+            return prev
+        raise UpdateFailed(f"Modbus read failed: {err}") from err
 
     # ── Write helpers ─────────────────────────────────────────────────────────
 

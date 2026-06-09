@@ -11,7 +11,9 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
+from custom_components.kvent.const import POLL_FAILURE_GRACE
 from custom_components.kvent.coordinator import KVentCoordinator
 from custom_components.kvent.modbus import KVentData
 
@@ -116,3 +118,62 @@ async def test_first_poll_with_no_prev_accepts_value_as_is():
     out = await coord._async_update_data()
 
     assert out.supply_temp == 24.0
+
+
+# ── Transient poll-failure grace (v0.0.25) ────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_transient_failure_within_grace_carries_forward():
+    """A single failed poll keeps entities available by reusing the last snapshot."""
+    prev = _data(power=True, supply_temp=25.2)
+    coord = _coordinator(prev, new=prev)
+    coord._client.async_read_all = AsyncMock(side_effect=TimeoutError())
+
+    out = await coord._async_update_data()
+
+    assert out is prev  # carried forward, no UpdateFailed → entity stays `on`
+
+
+@pytest.mark.asyncio
+async def test_sustained_failure_beyond_grace_raises():
+    """Once consecutive failures exceed the grace window, surface UpdateFailed."""
+    prev = _data(power=True)
+    coord = _coordinator(prev, new=prev)
+    coord._client.async_read_all = AsyncMock(side_effect=TimeoutError())
+
+    for _ in range(POLL_FAILURE_GRACE):
+        assert await coord._async_update_data() is prev  # absorbed
+    with pytest.raises(UpdateFailed):
+        await coord._async_update_data()  # grace exhausted
+
+
+@pytest.mark.asyncio
+async def test_failure_with_no_prev_raises_immediately():
+    """No prior snapshot to fall back on → fail on the first error."""
+    coord = _coordinator(prev=None, new=_data())
+    coord._client.async_read_all = AsyncMock(side_effect=TimeoutError())
+
+    with pytest.raises(UpdateFailed):
+        await coord._async_update_data()
+
+
+@pytest.mark.asyncio
+async def test_success_resets_grace_counter():
+    """A good poll between blips re-arms the full grace window."""
+    prev = _data(power=True)
+    good = _data(power=True, supply_temp=24.9)
+    coord = _coordinator(prev, new=prev)
+
+    # Burn grace − 1 failures, then a success must reset the counter.
+    coord._client.async_read_all = AsyncMock(side_effect=TimeoutError())
+    for _ in range(POLL_FAILURE_GRACE - 1):
+        await coord._async_update_data()
+    coord._client.async_read_all = AsyncMock(return_value=good)
+    await coord._async_update_data()
+    assert coord._consecutive_failures == 0
+
+    # Counter reset means a fresh full grace window is available again.
+    coord._client.async_read_all = AsyncMock(side_effect=TimeoutError())
+    for _ in range(POLL_FAILURE_GRACE):
+        assert await coord._async_update_data() is not None
