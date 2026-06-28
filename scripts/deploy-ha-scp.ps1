@@ -15,7 +15,15 @@ if (-not (Test-Path $EnvFile)) {
 # Parse KEY=VALUE lines; ignore comments and blanks
 Get-Content $EnvFile | ForEach-Object {
     if ($_ -match '^\s*([^#\s][^=]*)=(.*)$') {
-        [System.Environment]::SetEnvironmentVariable($matches[1].Trim(), $matches[2].Trim())
+        $k = $matches[1].Trim()
+        $v = $matches[2].Trim()
+        # Strip surrounding matched single/double quotes (workspace rule:
+        # mirrors python-dotenv; copy-pasted `KEY='value'` otherwise lands
+        # literal quotes in the value and silently breaks auth).
+        if ($v.Length -ge 2 -and $v[0] -eq $v[$v.Length - 1] -and ($v[0] -eq "'" -or $v[0] -eq '"')) {
+            $v = $v.Substring(1, $v.Length - 2)
+        }
+        [System.Environment]::SetEnvironmentVariable($k, $v)
     }
 }
 
