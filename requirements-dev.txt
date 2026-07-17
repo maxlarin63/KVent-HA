@@ -2,6 +2,10 @@
 #
 # Usage (Python 3.12):
 #
+#   uv venv --python 3.12 .venv
+#   uv pip install -r requirements-dev.txt
+#
+#   # or, without uv:
 #   py -3.12 -m venv .venv
 #   .\.venv\Scripts\Activate.ps1        # PowerShell
 #   # source .venv/bin/activate          # Linux/macOS
@@ -11,6 +15,11 @@
 
 pytest
 pytest-asyncio
-pytest-homeassistant-custom-component
+# Newest harness whose pinned HA still supports Python 3.12 (HA 2025.2+ needs 3.13).
+pytest-homeassistant-custom-component==0.13.205
+# HA 2025.1.4 pins this pre-release; declared directly so uv's resolver accepts it
+# (pip takes transitive pre-release pins, uv only explicit ones). Drop when the
+# harness pin above moves past HA 2025.1.x.
+aiohasupervisor==0.2.2b5
 pytest-socket
 ruff
