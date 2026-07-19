@@ -1,0 +1,27 @@
+{
+  "entity": {
+    "climate": {
+      "komfovent_climate": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "Auto": "mdi:fan-auto",
+              "Speed 1": "mdi:fan-speed-1",
+              "Speed 2": "mdi:fan-speed-2",
+              "Speed 3": "mdi:fan-speed-3",
+              "Boost": "mdi:weather-windy",
+              "Standby": "mdi:power-standby",
+              "service_alert": "mdi:wrench"
+            }
+          },
+          "swing_mode": {
+            "state": {
+              "Summer": "mdi:weather-sunny",
+              "Winter": "mdi:snowflake"
+            }
+          }
+        }
+      }
+    }
+  }
+}
