@@ -114,7 +114,7 @@ async def test_async_read_all_parses_blocks_correctly():
         if addr == 1000:
             return [1, 1]                # power=ON, season=WINTER
         if addr == 1007:
-            return [0x4000, 0x0020, 5]   # service bit 14; stop flags bit 5 (frost); stop code 5
+            return [0x2000, 0x0020, 5]   # service (manual bit №14 = 0x2000); stop flags bit 5 (frost); stop code 5
         if addr == 1100:
             return [2, 3, 1]             # speed_manual=2, speed=3, mode=AUTO
         if addr == 1114:
@@ -137,6 +137,40 @@ async def test_async_read_all_parses_blocks_correctly():
     assert data.setpoint == pytest.approx(25.0)
     assert data.alarm_stop_flags == 0x0020
     assert data.alarm_stop_code == 5
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("reg_1007", "expected_service"),
+    [
+        # Captured from the live C4 on 2026-07-21 with the panel blinking
+        # "service time": manual "14-Service" is 1-based, so bit №14 = 0x2000.
+        (0x2000, True),
+        # 0x4000 was the old (wrong) mask — must NOT read as service required.
+        (0x4000, False),
+        (0x0000, False),
+    ],
+)
+async def test_service_bit_is_manual_bit_14_one_based(reg_1007, expected_service):
+    client = KVentModbusClient("127.0.0.1", 502)
+
+    async def fake_read(addr, count):
+        if addr == 1000:
+            return [1, 1]
+        if addr == 1007:
+            return [reg_1007, 0, 0]
+        if addr == 1100:
+            return [2, 2, 0]
+        if addr == 1114:
+            return [1]
+        if addr == 1200:
+            return [200, 250]
+        return []
+
+    client.read_registers = fake_read
+
+    data = await client.async_read_all()
+    assert data.service is expected_service
     assert data.fans_running is True
 
 

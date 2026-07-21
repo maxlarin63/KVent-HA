@@ -3,7 +3,7 @@
 DOMAIN = "kvent"
 
 # Integration version (also mirrored in manifest.json)
-INTEGRATION_VERSION = "0.0.27"
+INTEGRATION_VERSION = "0.0.28"
 
 # Config entry keys
 CONF_HOST = "host"
@@ -27,7 +27,7 @@ POLL_FAILURE_GRACE = 3
 # ──────────────────────────────────────────────
 REG_STATUS = 1000        # R/W  0=off, 1=on
 REG_SEASON = 1001        # R/W  0=summer, 1=winter
-REG_SERVICE = 1007       # R    alarm warnings (binary) — bit 14 = 0x4000 ⇒ service required
+REG_SERVICE = 1007       # R    alarm warnings (binary) — manual bit №14 (1-based) = 0x2000 ⇒ service required
 REG_ALARM_STOP_FLAGS = 1008  # R  binary stop-condition bits (sensor / heater / frost / rotor / air-temp)
 REG_ALARM_STOP_CODE = 1009   # R  integer stop reason code (0 = no stop)
 REG_SPEED_MANUAL = 1100  # R/W  manual level 1–3 only (per table); 0/4 appear on 1101
@@ -39,8 +39,10 @@ REG_SETPOINT = 1201      # R/W  signed int16 / 10 → °C; doc range 0..300 (0�
 REG_OVR_ENABLE = 1111    # R/W  OVR enable — 1 = enabled (Boost preset)
 REG_OVR_TIME = 1112      # R/W  OVR duration 1..90 minutes
 
-# 1007 is typed “binary” in the manual; bit 14 encodes service required
-SERVICE_BIT_MASK = 0x4000
+# 1007 is typed “binary” in the manual; “14-Service” counts bits 1-based,
+# so bit №14 = 1 << 13 = 0x2000. Verified on the live C4 2026-07-21: panel
+# blinking “service time” reads 1007 = 0x2000 exactly.
+SERVICE_BIT_MASK = 0x2000
 
 # Default OVR duration when activating Boost (register 1112, minutes)
 DEFAULT_OVR_MINUTES = 30

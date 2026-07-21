@@ -1,7 +1,7 @@
 """Binary sensor platform for KVent (Komfovent C4).
 
 Entities:
-  - Service Required  (REG_SERVICE 1007, binary: bit 14 = 0x4000)
+  - Service Required  (REG_SERVICE 1007, binary: manual bit №14 = 0x2000)
       DeviceClass.PROBLEM → on = problem present
 """
 from __future__ import annotations

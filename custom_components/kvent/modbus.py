@@ -43,7 +43,7 @@ class KVentData:
 
     power: bool           # REG_STATUS  (1000)
     season: int           # REG_SEASON  (1001)  0=summer, 1=winter
-    service: bool         # REG_SERVICE (1007)  binary: bit 14 set ⇒ service required
+    service: bool         # REG_SERVICE (1007)  binary: manual bit №14 (0x2000) set ⇒ service required
     speed_manual: int     # REG_SPEED_MANUAL (1100)  commanded 1–3 (table); read-back only
     speed: int            # REG_SPEED        (1101)  0–4 actual level
     mode: int             # REG_MODE         (1102)  0=manual, 1=auto
